@@ -1,0 +1,13 @@
+{
+  "name": "d3-table-report",
+  "description": "d3 table report",
+  "dependencies": {},
+  "development": {},
+  "main": "index.js",
+  "scripts": [
+    "index.js"
+  ],
+  "styles": [
+    "d3-table-report.css"
+  ]
+}
