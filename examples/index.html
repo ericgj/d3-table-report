@@ -30,7 +30,8 @@
                         td.style('background-color', function(d){ return d.color; })
                       }) 
                   )
-                  .sort( function(d){ return d.color; }, d3.ascending)
+                  .col( report.col('id') )
+                  .sort(1)
                   .rollup( function(recs){
                       return { count: recs.length };
                   })

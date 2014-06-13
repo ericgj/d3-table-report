@@ -1,3 +1,6 @@
+'use strict';
+
+var Sorter = require('./sorter');
 
 module.exports = report;
 
@@ -7,13 +10,14 @@ function report(){
       , rollup = null
       , data = []
       , cols = []
-      , sorts = []
+      , sorter = new Sorter()
       , summaryRow = null
       , grandRow = null
     
     function render(selection){
         console.log(JSON.stringify(groupData()));
-        
+        console.log(JSON.stringify(sorter));
+
         var thead = selection.selectAll('thead').data([0])
         thead.enter().append('thead')
         
@@ -82,28 +86,29 @@ function report(){
         // events
         
         colrows.on('click', function(col){
-            render.unsort();
-            render.sort(col.accessor, d3.descending);
-            render(selection);
+          render.sort(col.index);
+          render(selection);
         });
     }
     
     
     // raw object or builder function
     render.col = function(_){
-        cols.push( typeof _ == 'function' ? _() : _ );
+        var col = ( typeof _ == 'function' ? _() : _ );
+        cols.push(col);
+        col.index = cols.length - 1;
+        sorter.add(col.accessor);
         return this;
     }
     
-    render.sort = function(accessor, fn){
-      fn = fn || d3.ascending;
-      sorts.push([accessor,fn]);
+    render.sort = function(index){
+      sorter.set(index);
       return this;
     }
     
     render.unsort = function(){
-        sorts = [];
-        return this;
+      sorter.clear();
+      return this;
     }
     
     render.group = function(_){
@@ -132,29 +137,13 @@ function report(){
     }  
     
     function nest(){
-        var comp = sortfn()
+        var comp = sorter && sorter.sort()
         var ret = d3.nest().key(group).sortKeys(d3.ascending)
         if (!comp) return ret;
         return ret.sortValues(comp);
     }
     
-    function sortby(accessor,fn){
-        fn = fn || d3.ascending;
-        return function(a,b){ return fn(accessor(a),accessor(b)); }
-    }
-    
-    function sortfn(){   
-        return function(a,b){
-            var result = 0; i = -1;
-            while (result == 0 && i<sorts.length){
-              i++;
-              var accessor = sorts[i][0], fn = sorts[i][1];
-              result = sortby(accessor, fn)(a,b);
-            }
-            return result;
-        }
-    }
-            
+           
     function groupData(){
       return nest().entries(data);
     }
@@ -178,7 +167,7 @@ function report(){
         });
     }
     
-    // note kludge to update td data from tr; does not automatically update
+    // note kludge to update td data from parent tr; does not automatically update
     // when data is rebound
     function renderCols(tr){
         var cells = tr.selectAll('td').datum(function(d){
@@ -198,6 +187,10 @@ report.col = function(name){
     
     builder.label = function(_){
       instance.label = _; return this;
+    }
+
+    builder.setName = function(_){
+      instance.name = _; return this;
     }
     
     builder.accessor = function(_){
@@ -219,6 +212,7 @@ report.col = function(name){
     
     if (name){
         builder.accessor(name);
+        builder.setName(name);
         builder.label(name);
     }
     
