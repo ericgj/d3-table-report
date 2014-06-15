@@ -1,6 +1,7 @@
 {
   "name": "d3-table-report",
   "description": "d3 table report",
+  "version": "0.0.3",
   "dependencies": {},
   "development": {},
   "main": "index.js",
