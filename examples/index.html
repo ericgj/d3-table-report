@@ -4,6 +4,9 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <link rel="stylesheet" href="../build/build.css" />
     <style>
+      #report {
+        width: 100%;
+      }
     </style>
   </head>
   <body>
@@ -13,6 +16,7 @@
     <script src="../build/build.js"></script>
     <script>
       var report = require('d3-table-report');
+      
       var data = [
           { id: 1, name: "A", type: "absurd", color: "aqua" },
           { id: 2, name: "B", type: "bold", color: "brown" },
@@ -25,13 +29,13 @@
       d3.select('#report').call( 
           report().group(function(d){ return d.name; } )
                   .data(data)
+                  .sorter( report.multisorter() )
                   .col( report.col('type').width('25%') )
                   .col( report.col('color').width('45%').render( function(td){
                         td.style('background-color', function(d){ return d.color; })
                       }) 
                   )
                   .col( report.col('id') )
-                  .sort(1)
                   .rollup( function(recs){
                       return { count: recs.length };
                   })
@@ -50,3 +54,4 @@
     </script>
   </body>
 </html>
+

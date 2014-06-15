@@ -5,8 +5,7 @@
   "development": {},
   "main": "index.js",
   "scripts": [
-    "index.js",
-    "sorter.js"
+    "index.js"
   ],
   "styles": [
     "d3-table-report.css"

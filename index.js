@@ -1,6 +1,5 @@
 'use strict';
 
-var Sorter = require('./sorter');
 
 module.exports = report;
 
@@ -10,13 +9,12 @@ function report(){
       , rollup = null
       , data = []
       , cols = []
-      , sorter = new Sorter()
+      , sorter = null
       , summaryRow = null
       , grandRow = null
     
     function render(selection){
         console.log(JSON.stringify(groupData()));
-        console.log(JSON.stringify(sorter));
 
         var thead = selection.selectAll('thead').data([0])
         thead.enter().append('thead')
@@ -29,8 +27,13 @@ function report(){
         
         thead.selectAll('tr').data([0]).enter().append('tr')
         var colrows = thead.select('tr').selectAll('th').data(cols)
-        colrows.enter().append('th')
-        colrows.text(function(d){ return d.label; })
+        colrows.enter()
+                 .append('th')
+                 .style("width", function(col){ return col.width; })
+        colrows.text(function(col){ return col.label; })
+               .classed('sorted', isSorted())
+               .classed('asc', isSorted('asc'))
+               .classed('desc', isSorted('desc'))
         colrows.exit().remove()
         
         var grouprows = tbody.selectAll('tr.group').data(groupData())
@@ -85,32 +88,24 @@ function report(){
         
         // events
         
-        colrows.on('click', function(col){
-          render.sort(col.index);
+        colrows.on('click', function(col,i){
+          sorter.next(i);
           render(selection);
         });
     }
     
+    render.sorter = function(_){
+      if (arguments.length == 0) return sorter;
+      sorter = _; return this;
+    }
     
-    // raw object or builder function
-    render.col = function(_){
-        var col = ( typeof _ == 'function' ? _() : _ );
+    render.col = function(col){
+        var col = (typeof col == 'function' ? col() : col);
         cols.push(col);
-        col.index = cols.length - 1;
-        sorter.add(col.accessor);
+        if (sorter) sorter.push(col.accessor);
         return this;
     }
-    
-    render.sort = function(index){
-      sorter.set(index);
-      return this;
-    }
-    
-    render.unsort = function(){
-      sorter.clear();
-      return this;
-    }
-    
+   
     render.group = function(_){
         if (arguments.length == 0) return group;
         group = _; return this;
@@ -136,14 +131,41 @@ function report(){
         grandRow = _; return this;
     }  
     
+    // private 
+    
+    function appendCols(tr){
+        cols.forEach( function(col,i){
+          tr.append('td').style("width", col.width).classed('col-'+i,true);
+        });
+    }
+    
+    // note kludge to update td data from parent tr; does not automatically update
+    // when data is rebound
+    function renderCols(tr){
+        var cells = tr.selectAll('td').datum(function(d){
+          return d3.select(this.parentElement).datum();
+        })
+                       
+        cells.each( function(d,i){ 
+          cols[i].render(d3.select(this));
+        });
+    }
+ 
+    function isSorted(dir){
+      return function(col,i){
+        if (!sorter) return false;
+        var cur = sorter.direction(i);
+        return (dir ? cur == dir : !!cur);
+      }
+    }
+
     function nest(){
-        var comp = sorter && sorter.sort()
+        var comp = sorter && sorter()
         var ret = d3.nest().key(group).sortKeys(d3.ascending)
         if (!comp) return ret;
         return ret.sortValues(comp);
     }
     
-           
     function groupData(){
       return nest().entries(data);
     }
@@ -160,25 +182,7 @@ function report(){
     function rollupData(){
       return d3.nest().rollup(rollup).entries(data);
     }
-    
-    function appendCols(tr){
-        cols.forEach( function(col,i){
-          tr.append('td').style("width", col.width).classed('col-'+i,true);
-        });
-    }
-    
-    // note kludge to update td data from parent tr; does not automatically update
-    // when data is rebound
-    function renderCols(tr){
-        var cells = tr.selectAll('td').datum(function(d){
-          return d3.select(this.parentElement).datum();
-        })
-                       
-        cells.each( function(d,i){ 
-            cols[i].render(d3.select(this));
-        });
-    }
-        
+       
     return render;
 }
 
@@ -194,7 +198,7 @@ report.col = function(name){
     }
     
     builder.accessor = function(_){
-      instance.accessor = ( typeof _ == "function" ? _ : function(d){ return d[_]; } );
+      instance.accessor = ( typeof _ == "function" ? _ : fetchfn(_) );
       return this;
     }
     
@@ -210,6 +214,10 @@ report.col = function(name){
       td.text(instance.accessor); 
     }     
     
+    function fetchfn(name){
+      return function(d){ return d[name]; };
+    }
+
     if (name){
         builder.accessor(name);
         builder.setName(name);
@@ -224,4 +232,84 @@ report.col = function(name){
 }
 
 
+report.multisorter = function(){
 
+  var LABEL = [ null, 'asc', 'desc' ]
+    , FN    = [ function(){ return 0; }, d3.ascending, d3.descending ]
+
+  var accessors = []
+    , directions = []
+    , orders = []
+    , curs = -1
+
+  sort.push = function(accessor){
+    accessors.push(accessor);
+    return this;
+  }
+
+  sort.next = function(i){
+    curs++;
+    directions[i] = ((directions[i] || 0) + 1) % 3;
+    orders[i] = orders[i] || curs;
+    return this;
+  }
+
+  sort.clear = function(){
+    directions = []; orders = []; curs = -1;
+    return this;
+  }
+
+  sort.direction = function(i){
+    return LABEL[ directions[i] ];
+  }
+
+  sort.order = function(i){
+    return orders[i];
+  }
+
+  function sort(){
+    if (orders.length == 0) return;  // note undefined == no sort
+    var ord = compact(indexValues(orders));
+    var sorts = d3.permute( accessors, ord );
+    var fns = ord.map( function(i){ return FN[ directions[i] ]; } );
+    
+    return multisortfn(sorts, fns);
+  }
+
+  // private
+
+  function sortfn(accessor,fn){
+    return function(a,b){ return fn(accessor(a),accessor(b)); }
+  }
+
+  function multisortfn(accessors,fns){   
+    return function(a,b){
+      var result = 0, i = 0;
+      while (result == 0 && i<accessors.length){
+        var accessor = accessors[i], fn = fns[i];
+        result = sortfn(accessor, fn)(a,b);
+        i++;
+      }
+      return result;
+    }
+  }
+
+  function indexValues(arr){
+    var ret = [];
+    arr.forEach( function(val,i){
+      ret[val] = i;
+    });
+    return ret;
+  }
+
+  function compact(arr){
+    return arr.filter(function(val){ 
+      return !(val == undefined ||
+               val == null
+              ); 
+    });
+  }
+  
+
+  return sort;
+}

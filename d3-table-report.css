@@ -2,4 +2,11 @@
   cursor: pointer;
 }
 
+.d3-table-report > thead > tr > th.asc:after {
+  content: "\25B2";
+}
+
+.d3-table-report > thead > tr > th.desc:after {
+  content: "\25BC";
+}
 
