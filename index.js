@@ -102,61 +102,61 @@ function report(){
     }
     
     render.col = function(col){
-        var col = (typeof col == 'function' ? col() : normalizeCol(col) );
-        cols.push({ 
-          name: col.name, 
-          label: col.label,
-          width: col.width  
-        });
-        colrenders.push(col.render);
-        if (sorter) sorter.push(col.accessor);
-        return this;
+      var col = (typeof col == 'function' ? col() : normalizeCol(col) );
+      cols.push({ 
+        name: col.name, 
+        label: col.label,
+        width: col.width  
+      });
+      colrenders.push(col.render);
+      if (sorter) sorter.push(col.accessor);
+      return this;
     }
    
     render.group = function(_){
-        if (arguments.length == 0) return group;
-        group = _; return this;
+      if (arguments.length == 0) return group;
+      group = _; return this;
     }
     
     render.data = function(_){
-        if (arguments.length == 0) return data;
-        data = _; return this;
+      if (arguments.length == 0) return data;
+      data = _; return this;
     }
        
     render.rollup = function(_){
-        if (arguments.length == 0) return rollup;
-        rollup = _; return this;
+      if (arguments.length == 0) return rollup;
+      rollup = _; return this;
     }
 
     render.summaryRow = function(_){
-        if (arguments.length == 0) return summaryRow;
-        summaryRow = _; return this;
+      if (arguments.length == 0) return summaryRow;
+      summaryRow = _; return this;
     }
     
     render.grandRow = function(_){
-        if (arguments.length == 0) return grandRow;
-        grandRow = _; return this;
+      if (arguments.length == 0) return grandRow;
+      grandRow = _; return this;
     }  
     
     // private 
     
 
     function appendCols(tr){
-        cols.forEach( function(col,i){
-          tr.append('td').style("width", col.width).classed('col-'+i,true);
-        });
+      cols.forEach( function(col,i){
+        tr.append('td').style("width", col.width).classed('col-'+i,true);
+      });
     }
     
     // note kludge to update td data from parent tr; does not automatically update
     // when data is rebound
     function renderCols(tr){
-        var cells = tr.selectAll('td').datum(function(d){
-          return d3.select(this.parentElement).datum();
-        })
-                       
-        cells.each( function(d,i){ 
-          colrenders[i](d3.select(this));
-        });
+      var cells = tr.selectAll('td').datum(function(d){
+        return d3.select(this.parentElement).datum();
+      })
+                     
+      cells.each( function(d,i){ 
+        colrenders[i](d3.select(this));
+      });
     }
  
     function isSorted(dir){
@@ -204,6 +204,7 @@ function report(){
     return render;
 }
 
+
 report.col = function(name){
     var instance = { render: defaultRender }
     
@@ -221,11 +222,11 @@ report.col = function(name){
     }
     
     builder.render = function(_){
-        instance.render = _; return this;
+      instance.render = _; return this;
     }
 
     builder.width = function(_){
-        instance.width = _; return this;
+      instance.width = _; return this;
     }
     
     function defaultRender(td){
@@ -237,16 +238,68 @@ report.col = function(name){
     }
 
     if (name){
-        builder.accessor(name);
-        builder.setName(name);
-        builder.label(name);
+      builder.accessor(name);
+      builder.setName(name);
+      builder.label(name);
     }
     
     function builder(){
-        return instance;
+      return instance;
     }
     
     return builder;
+}
+
+
+report.sorter = function(){
+
+  var LABEL = [ null, 'asc', 'desc' ]
+    , FN    = [ function(){ return 0; }, d3.ascending, d3.descending ]
+
+  var accessors = []
+    , current = null
+    , direction = 0
+
+  sort.push = function(accessor){
+    accessors.push(accessor);
+    return this;
+  }
+
+  sort.next = function(i){
+    if (current == i){
+      direction = (direction + 1) % 3;
+    } else {
+      direction = 1;
+      current = i;
+    }
+    return this;
+  }
+
+  sort.clear = function(){
+    direction = 0; current = null;
+    return this;
+  }
+
+  sort.direction = function(i){
+    return (i == current ?  LABEL[ direction ] : null);
+  }
+
+  sort.order = function(i){
+    return (i == current ? true : false);
+  }
+
+  function sort(){
+    if (current == null) return;  // note null == no sort
+    return sortfn( accessors[current], FN[ direction ] );
+  }
+
+  // private
+
+  function sortfn(accessor,fn){
+    return function(a,b){ return fn(accessor(a),accessor(b)); }
+  }
+
+  return sort;
 }
 
 
