@@ -1,5 +1,6 @@
 'use strict';
 
+var has = hasOwnProperty;
 
 module.exports = report;
 
@@ -9,12 +10,13 @@ function report(){
       , rollup = null
       , data = []
       , cols = []
+      , colrenders = []
       , sorter = null
       , summaryRow = null
       , grandRow = null
     
     function render(selection){
-        console.log(JSON.stringify(groupData()));
+        // console.log(JSON.stringify(groupData()));
 
         var thead = selection.selectAll('thead').data([0])
         thead.enter().append('thead')
@@ -100,8 +102,13 @@ function report(){
     }
     
     render.col = function(col){
-        var col = (typeof col == 'function' ? col() : col);
-        cols.push(col);
+        var col = (typeof col == 'function' ? col() : normalizeCol(col) );
+        cols.push({ 
+          name: col.name, 
+          label: col.label,
+          width: col.width  
+        });
+        colrenders.push(col.render);
         if (sorter) sorter.push(col.accessor);
         return this;
     }
@@ -133,6 +140,7 @@ function report(){
     
     // private 
     
+
     function appendCols(tr){
         cols.forEach( function(col,i){
           tr.append('td').style("width", col.width).classed('col-'+i,true);
@@ -147,7 +155,7 @@ function report(){
         })
                        
         cells.each( function(d,i){ 
-          cols[i].render(d3.select(this));
+          colrenders[i](d3.select(this));
         });
     }
  
@@ -159,11 +167,21 @@ function report(){
       }
     }
 
+    function normalizeCol(col){
+      if (typeof col == 'string') return normalizeCol({name: col});
+      var builder = report.col(col.name)
+      for (var k in col){
+        if (k == 'name') continue;
+        if (has.call(builder,k)) builder[k](col[k]); // not ideal
+      }
+      return builder();
+    }
+
     function nest(){
-        var comp = sorter && sorter()
-        var ret = d3.nest().key(group).sortKeys(d3.ascending)
-        if (!comp) return ret;
-        return ret.sortValues(comp);
+      var comp = sorter && sorter()
+      var ret = d3.nest().key(group).sortKeys(d3.ascending)
+      if (!comp) return ret;
+      return ret.sortValues(comp);
     }
     
     function groupData(){

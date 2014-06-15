@@ -18,11 +18,11 @@
       var report = require('d3-table-report');
       
       var data = [
-          { id: 1, name: "A", type: "absurd", color: "aqua" },
-          { id: 2, name: "B", type: "bold", color: "brown" },
-          { id: 3, name: "C", type: "chatty", color: "chartreuse" },
-          { id: 4, name: "B", type: "boring", color: "black" },
-          { id: 5, name: "A", type: "avid", color: "azure" }
+          { id: 1, count: 20, name: "A", type: "absurd", color: "aqua" },
+          { id: 2, count: 30, name: "B", type: "bold", color: "brown" },
+          { id: 3, count: 40, name: "C", type: "chatty", color: "chartreuse" },
+          { id: 4, count: 29, name: "B", type: "boring", color: "black" },
+          { id: 5, count: 20, name: "A", type: "avid", color: "azure" }
       ];
 
 
@@ -35,7 +35,8 @@
                         td.style('background-color', function(d){ return d.color; })
                       }) 
                   )
-                  .col( report.col('id') )
+                  .col( 'id' )
+                  .col( { name: 'count', label: 'total' } )
                   .rollup( function(recs){
                       return { count: recs.length };
                   })
