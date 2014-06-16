@@ -1,57 +1,178 @@
 <html>
   <head>
-    <title>d3-table-report</title>
+    <title>Examples</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <link rel="stylesheet" href="../build/build.css" />
     <style>
-      #report {
-        width: 100%;
+      .d3-table-report {
+        width: 60%;
       }
     </style>
   </head>
   <body>
     <h1>d3 table report</h1>
-    <table id="report" class="d3-table-report"></table>
+    <nav id="tabs"></nav>
+    <div id="page">
+      <h2 class="title"></h2>
+      <table class="d3-table-report"></table>
+    </div>
+
+    <script src="page.js"></script>
     <script src="d3.v3.min.js"></script>
     <script src="../build/build.js"></script>
     <script>
+      var CENSUS_DATA_URL = 'http://api.census.gov/data/2012/acs5/profile?get=DP03_0119PE,DP03_0122PE,DP03_0123PE,DP03_0125PE,DP03_0126PE&for=state:*&key=64acfcf8995f5d31f51c47b27fd3129faa30db3f'
+
       var report = require('d3-table-report');
+
+      var tabdata = [
+        ['simple'   , 'Simple'    , 'Simple table, no groups or sorting' ],
+        ['groups'   , 'Groups'    , 'With groups' ],
+        ['sort'     , 'Sort'      , 'Single column sorting' ],
+        ['multisort', 'Multi-sort', 'Multi column sorting'  ]
+      ]
+
+      var tabreport = {};
+      tabreport.simple = 
+        report().col({name: 'state', width: '5%'})
+                .col( report.col('ALL FAMILIES').width('15%') )
+                .col( report.col('ALL MARRIED COUPLES').width('15%') )
+                .col( report.col('MARRIED COUPLES WITH CHILDREN').width('20%') )
+                .col( 'ALL SINGLE WOMEN' )
+                .col( report.col('SINGLE WOMEN WITH CHILDREN').width('20%') )
+     
+      tabreport.groups =
+        report().col('state')
+                .col( report.col('% in poverty').accessor(function(d){ return d['ALL FAMILIES']; }) )
+                .group( function(d){ return intervalOf(d['ALL FAMILIES'], [5,10,15,20]); } )
+                .rollup( function(recs){
+                  return { mean: d3.mean(recs, function(d){ return d['ALL FAMILIES']; }) }
+                })
+                .grandRow( function(th){
+                    th.text( function(d){
+                        return "Mean poverty rate: " + d3.format('4.2f')(d.mean);
+                    })
+                })
+
+      tabreport.sort =
+        report().sorter( report.sorter() )
+                .col('state')
+                .col( report.col('% in poverty').accessor(function(d){ return d['ALL FAMILIES']; }) )
+                .group( function(d){ return intervalOf(d['ALL FAMILIES'], [5,10,15,20]); } )
+                .rollup( function(recs){
+                  return { mean: d3.mean(recs, function(d){ return d['ALL FAMILIES']; }) }
+                })
+                .grandRow( function(th){
+                    th.text( function(d){
+                        return "Mean poverty rate: " + d3.format('4.2f')(d.mean);
+                    })
+                })
+
+      tabreport.multisort =
+        report().sorter( report.multisorter() )
+                .col({name: 'state', width: '5%'})
+                .col( report.col('ALL FAMILIES').width('15%') )
+                .col( report.col('ALL MARRIED COUPLES').width('15%') )
+                .col( report.col('MARRIED COUPLES WITH CHILDREN').width('20%') )
+                .col( 'ALL SINGLE WOMEN' )
+                .col( report.col('SINGLE WOMEN WITH CHILDREN').width('20%') )
+
+      tabdata.forEach( function(d,i){
+        page('/' + d[0], clearPage, selectTab(i), renderPage(d));
+      });
+ 
+      var fips = {};
+      d3.csv('/data/fips.csv').get( function(err,rows){
+        if (err) throw err;
+        rows.forEach(function(row){
+          fips[row['fips']] = row['state']
+        });
+      })
+
+      var decode = {};
+      d3.csv('/data/decode.csv').get( function(err,rows){
+        if (err) throw err;
+        rows.forEach(function(row){
+          decode[row['code']] = row['decode']
+        });
+      })
+
+      setupPages();
+
+      function setupPages(){
+        var nav = d3.select('#tabs').selectAll('ul').data([0])
+        nav.enter().append('ul');
+
+        var tabs = nav.selectAll('li').data(tabdata);
+        tabs.enter().append('li');
+        tabs.text(function(d){ return d[1]; });
+        tabs.on('click', function(d){ page('/' + d[0]); });
+        tabs.exit().remove();
+      }
+     
+      function clearPage(ctx,next){
+        empty(document.querySelector('.d3-table-report'));
+        next();
+      }
+
+      function selectTab(n){
+        return function(ctx,next){ 
+          var tabs = d3.select('#tabs > ul').selectAll('li')
+          tabs.classed('selected', function(d,i){ return n == i; });
+          next();
+        }
+      }
+
+      function renderPage(tab){
+        return function(ctx,next){
+          var page = d3.select('#page');
+          var title = page.select('.title');
+          title.text(tab[2]);
+          var table = page.select('.d3-table-report');
+
+          d3.json(CENSUS_DATA_URL).get(function(err,raw){
+            if (err) throw err;
+            data = []; cols = [];
+            raw.forEach( function(vals,i){
+              if (i==0) {
+                cols = vals.map( function(val){ return decode[val] || val; } );
+              } else {
+                var row = {};
+                cols.forEach( function(c,j){
+                  if (c == 'state'){ row[c] = fips[vals[j]] || vals[j]; }
+                  else             { row[c] = +vals[j]; }
+                });
+                data.push(row);
+              }
+            });
+
+            table.call( tabreport[tab[0]].data(data) );
+            next();
+          });
+        }
+      }
       
-      var data = [
-          { id: 1, count: 20, name: "A", type: "absurd", color: "aqua" },
-          { id: 2, count: 30, name: "B", type: "bold", color: "brown" },
-          { id: 3, count: 40, name: "C", type: "chatty", color: "chartreuse" },
-          { id: 4, count: 29, name: "B", type: "boring", color: "black" },
-          { id: 5, count: 20, name: "A", type: "avid", color: "azure" }
-      ];
+      function empty(el, node){
+        while (node = el.firstChild) el.removeChild(node);
+        return el;
+      };
+      
+      function intervalOf(val, intervals){
+        var len = String(intervals[intervals.length-1]).length;
+        for (var i=0;i<intervals.length;++i){
+          if (val <= intervals[i]) {
+            return (i == 0 ? 
+                     padLeft(intervals[i],len," ") + " or less" : 
+                     padLeft(intervals[i-1],len," ") + " - " + padLeft(intervals[i],len," ")
+                   );
+          }
+        }
+        return "> " + padLeft(intervals[intervals.length-1],len," ");
+      }
 
-
-      d3.select('#report').call( 
-          report().group(function(d){ return d.name; } )
-                  .data(data)
-                  .sorter( report.multisorter() )
-                  .col( report.col('type').width('25%') )
-                  .col( report.col('color').width('45%').render( function(td){
-                        td.style('background-color', function(d){ return d.color; })
-                      }) 
-                  )
-                  .col( 'id' )
-                  .col( { name: 'count', label: 'total' } )
-                  .rollup( function(recs){
-                      return { count: recs.length };
-                  })
-                  .summaryRow( function(th){
-                      th.text( function(d){
-                          return d.key + ' total: ' + d.values.count;
-                      })
-                  })
-                  .grandRow( function(th){
-                      th.text( function(d){
-                          return "Grand total: " + d.count;
-                      })
-                  })
-      )
-
+      function padLeft(n,len,str){
+        return Array(len-String(n).length+1).join(str||'0') + n;
+      }
     </script>
   </body>
 </html>

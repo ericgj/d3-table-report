@@ -80,14 +80,16 @@ function report(){
         
         grouprows.exit().remove()
         
-        var grandrow = tfoot.selectAll('tr.grand').data([0])
-        grandrow.enter()
-          .append('tr').classed('grand',true)
-        var grandcell = grandrow.selectAll('th').data([rollupData()])
-        grandcell.enter().append('th').attr('colspan',2)
-        grandcell.call( grandRow );
-        grandcell.exit().remove()
-        
+        if (grandRow){
+          var grandrow = tfoot.selectAll('tr.grand').data([0])
+          grandrow.enter()
+            .append('tr').classed('grand',true)
+          var grandcell = grandrow.selectAll('th').data([rollupData()])
+          grandcell.enter().append('th').attr('colspan',2)
+          grandcell.call( grandRow );
+          grandcell.exit().remove()
+        }
+
         // events
         
         colrows.on('click', function(col,i){
@@ -179,7 +181,8 @@ function report(){
 
     function nest(){
       var comp = sorter && sorter()
-      var ret = d3.nest().key(group).sortKeys(d3.ascending)
+      var grp = group || function(){ return ''; }
+      var ret = d3.nest().key(grp).sortKeys(d3.ascending)
       if (!comp) return ret;
       return ret.sortValues(comp);
     }
