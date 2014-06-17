@@ -1,4 +1,4 @@
-.d3-table-report > thead > tr > th {
+.d3-table-report > thead > tr > th.sortable {
   cursor: pointer;
 }
 

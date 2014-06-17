@@ -1,213 +1,242 @@
 'use strict';
 
-var has = hasOwnProperty;
+var has = hasOwnProperty
+  , emptyfn = function(){return '';}
 
 module.exports = report;
 
-function report(){
+/*
+ * report
+ * configure and run report
+ * typical usage:
+ *   d3.select('#mytable').call( report(). .... );
+ *
+ */
+function report(sorter){
     
-    var group = null
-      , rollup = null
-      , data = []
-      , cols = []
-      , colrenders = []
-      , sorter = null
-      , summaryRow = null
-      , grandRow = null
-    
-    function render(selection){
-        // console.log(JSON.stringify(groupData()));
+  var group = null
+    , rollup = null
+    , data = []
+    , cols = []
+    , colrenders = []
+    , footer = null
+  
+  /*
+   * report()(selection)
+   * render the report at d3 selection
+   * 
+   */
+  function render(selection){
 
-        var thead = selection.selectAll('thead').data([0])
-        thead.enter().append('thead')
-        
-        var tfoot = selection.selectAll('tfoot').data([0])
-        tfoot.enter().append('tfoot')
-        
-        var tbody = selection.selectAll('tbody').data([0])
-        tbody.enter().append('tbody')
-        
-        thead.selectAll('tr').data([0]).enter().append('tr')
-        var colrows = thead.select('tr').selectAll('th').data(cols)
-        colrows.enter()
-                 .append('th')
-                 .style("width", function(col){ return col.width; })
-        colrows.text(function(col){ return col.label; })
-               .classed('sorted', isSorted())
-               .classed('asc', isSorted('asc'))
-               .classed('desc', isSorted('desc'))
-        colrows.exit().remove()
-        
-        var grouprows = tbody.selectAll('tr.group').data(groupData())
-        grouprows.enter()
-            .append('tr').classed('group',true)
-            .append('th').attr('colspan', cols.length, true)
-                         .text(function(d){ return d.key; })
-        
-        // kludgy, since the table row structure is flattened while the data is not
-        grouprows.each( function(d,i){
-            var nextsib = this.nextElementSibling
-              , nextsibfn = function(){ return nextsib; }
+    var grpdata   = groupData();
+    var grpmap    = groupRollupDataMap();
 
-            var rows =
-              d3.select(this.parentElement).selectAll('tr.values.group-' + i)
-            .data(d.values)
-              
-            rows.enter()
-                  .insert('tr',nextsibfn).classed('values',true).classed('group-'+i, true)     
-                  .call( appendCols )     
-            
-            rows.call( renderCols )
-            
-            rows.exit().remove()
-            
-            if (summaryRow){
-                
-                var sumrow = 
-                  d3.select(this.parentElement).selectAll('tr.summary.group-'+i).data([0])
-                sumrow.enter()
-                     .insert('tr',nextsibfn).classed('summary',true).classed('group-'+i,true)
-                
-                  var sumcell = sumrow.selectAll('th')
-                                      .data([groupRollupDataFor(d.key)], function(r){ return r.key; })
-                  sumcell.enter().append('th').attr('colspan', cols.length)
-                  sumcell.call( summaryRow )
-                  
-                  sumcell.exit().remove()
-            }           
+    // basic table structure
+    var thead = selection.selectAll('thead').data([0])
+    thead.enter().append('thead')
+    
+    var tfoot = selection.selectAll('tfoot').data([0])
+    tfoot.enter().append('tfoot')
+    
+    var tbody = selection.selectAll('tbody').data([0])
+    tbody.enter().append('tbody')
+    
+    // table header row
+    thead.selectAll('tr').data([0]).enter().append('tr')
+    var colcells = thead.select('tr').selectAll('th').data(cols)
+    colcells.enter()
+              .append('th')
+              .style("width", function(col){ return col.width; })
+    colcells.text(function(col){ return col.label; })
+            .classed('sortable', function(){ return !!sorter; })
+            .classed('sorted', isSorted())
+            .classed('asc', isSorted('asc'))
+            .classed('desc', isSorted('desc'))
+    colcells.exit().remove()
+    
+    // group rows
+    var grouprows = tbody.selectAll('tr.group').data(grpdata)
+    grouprows.enter()
+        .append('tr').classed('group',true)
+        .append('th').attr('colspan', cols.length, true)
+    if (group.header) grouprows.select('th').call( group.header );
 
-        });
-        
-        grouprows.exit().remove()
-        
-        if (grandRow){
-          var grandrow = tfoot.selectAll('tr.grand').data([0])
-          grandrow.enter()
-            .append('tr').classed('grand',true)
-          var grandcell = grandrow.selectAll('th').data([rollupData()])
-          grandcell.enter().append('th').attr('colspan',2)
-          grandcell.call( grandRow );
-          grandcell.exit().remove()
-        }
+    // detail rows and summary (group footer) row inserted before next group row
+    // note: kludgy, since the table row structure is flattened while the data is not
+    grouprows.each( function(d,i){
 
-        // events
-        
-        colrows.on('click', function(col,i){
-          sorter.next(i);
-          render(selection);
-        });
-    }
+      var nextsib = this.nextElementSibling
+        , nextsibfn = function(){ return nextsib; }
+
+      // detail rows for current group
+      var rows = d3.select(this.parentElement).selectAll('tr.values.group-' + i)
+                   .data(d.values)
+      rows.enter()
+            .insert('tr',nextsibfn).classed('values',true).classed('group-'+i, true)     
+            .call( appendCols )     
+      rows.call( renderCols )
+      rows.exit().remove()
+      
+      if (group.footer) {
+         
+          var sumdata = { key: d.key, values: grpmap.get(d.key) }
+
+          // summary row 
+          var sumrow = 
+            d3.select(this.parentElement).selectAll('tr.summary.group-'+i).data([0])
+          sumrow.enter()
+                .insert('tr',nextsibfn).classed('summary',true).classed('group-'+i,true)
+          
+          var sumcells = sumrow.selectAll('th').data(cols.map( function(c){ return sumdata;} )) 
+          sumcells.enter().append('th');
+          sumcells.call( group.footer );
+          sumcells.exit().remove();
+      }           
+
+    });
+      
+    grouprows.exit().remove()
     
-    render.sorter = function(_){
-      if (arguments.length == 0) return sorter;
-      sorter = _; return this;
-    }
-    
-    render.col = function(col){
-      var col = (typeof col == 'function' ? col() : normalizeCol(col) );
-      cols.push({ 
-        name: col.name, 
-        label: col.label,
-        width: col.width  
-      });
-      colrenders.push(col.render);
-      if (sorter) sorter.push(col.accessor);
-      return this;
-    }
-   
-    render.group = function(_){
-      if (arguments.length == 0) return group;
-      group = _; return this;
-    }
-    
-    render.data = function(_){
-      if (arguments.length == 0) return data;
-      data = _; return this;
-    }
-       
-    render.rollup = function(_){
-      if (arguments.length == 0) return rollup;
-      rollup = _; return this;
+    if (footer){
+      var granddata = rollupData();
+      
+      // grand (table footer) row
+      var grandrow = tfoot.selectAll('tr.grand').data([0])
+      grandrow.enter()
+        .append('tr').classed('grand',true)
+
+      var grandcell = grandrow.selectAll('th').data(cols.map( function(c){ return granddata;} ))
+      grandcell.enter().append('th');
+      grandcell.call( footer );
+      grandcell.exit().remove()
     }
 
-    render.summaryRow = function(_){
-      if (arguments.length == 0) return summaryRow;
-      summaryRow = _; return this;
-    }
+    // events
     
-    render.grandRow = function(_){
-      if (arguments.length == 0) return grandRow;
-      grandRow = _; return this;
-    }  
-    
-    // private 
-    
+    // column sorting on click
+    colrows.on('click', function(col,i){
+      sorter.next(i);
+      render(selection);
+    });
+  }
+  
 
-    function appendCols(tr){
-      cols.forEach( function(col,i){
-        tr.append('td').style("width", col.width).classed('col-'+i,true);
-      });
-    }
-    
-    // note kludge to update td data from parent tr; does not automatically update
-    // when data is rebound
-    function renderCols(tr){
-      var cells = tr.selectAll('td').datum(function(d){
-        return d3.select(this.parentElement).datum();
-      })
-                     
-      cells.each( function(d,i){ 
-        colrenders[i](d3.select(this));
-      });
-    }
+  // option setters
+
+  render.sorter = function(_){
+    if (arguments.length == 0) return sorter;
+    sorter = _; return this;
+  }
+  
+  render.col = function(col){
+    var col = (typeof col == 'function' ? col() : normalizeParam(col, report.col) );
+    cols.push({ 
+      name: col.name, 
+      label: col.label,
+      width: col.width  
+    });
+    colrenders.push(col.render);
+    if (sorter) sorter.push(col.accessor);
+    return this;
+  }
  
-    function isSorted(dir){
-      return function(col,i){
-        if (!sorter) return false;
-        var cur = sorter.direction(i);
-        return (dir ? cur == dir : !!cur);
-      }
-    }
+  render.group = function(grp){
+    if (arguments.length == 0) return group;
+    group = (typeof grp == 'function' ? grp() : normalizeParam(grp, report.group) );
+    return this;   
+  }
+  
+  render.data = function(_){
+    if (arguments.length == 0) return data;
+    data = _; return this;
+  }
+     
+  render.rollup = function(_){
+    if (arguments.length == 0) return rollup;
+    rollup = _; return this;
+  }
+ 
+  render.footer = function(_){
+    if (arguments.length == 0) return footer;
+    footer = _; return this;
+  }  
+  
 
-    function normalizeCol(col){
-      if (typeof col == 'string') return normalizeCol({name: col});
-      var builder = report.col(col.name)
-      for (var k in col){
-        if (k == 'name') continue;
-        if (has.call(builder,k)) builder[k](col[k]); // not ideal
-      }
-      return builder();
-    }
+  // private 
 
-    function nest(){
-      var comp = sorter && sorter()
-      var grp = group || function(){ return ''; }
-      var ret = d3.nest().key(grp).sortKeys(d3.ascending)
-      if (!comp) return ret;
-      return ret.sortValues(comp);
+  function appendCols(tr){
+    cols.forEach( function(col,i){
+      tr.append('td').style("width", col.width).classed('col-'+i,true);
+    });
+  }
+  
+  // note kludge to update td data from parent tr; does not automatically update
+  // when data is rebound
+  function renderCols(tr){
+    var cells = tr.selectAll('td').datum(function(d){
+      return d3.select(this.parentElement).datum();
+    })
+                   
+    cells.each( function(d,i){ 
+      colrenders[i](d3.select(this));
+    });
+  }
+
+  function isSorted(dir){
+    return function(col,i){
+      if (!sorter) return false;
+      var cur = sorter.direction(i);
+      return (dir ? cur == dir : !!cur);
     }
+  }
+
+  function normalizeParam(p,constr){
+    if (typeof p == 'string') return normalizeParam({name: p},constr);
+    var builder = constr(p.name)
+    for (var k in p){
+      if (k == 'name') continue;
+      if (has.call(builder,k)) builder[k](p[k]); // not ideal
+    }
+    return builder();
+  }
+
+  function nest(){
+    var comp = sorter && sorter();
+    var grp = group.accessor;
+    var ret = d3.nest().key(grp).sortKeys(d3.ascending);
+    if (!comp) return ret;
+    return ret.sortValues(comp);
+  }
+  
+  function groupData(){
+    return nest().entries(data);
+  }
+  
+  function groupRollupData(){    
+    return nest().rollup(rollup).entries(data);
+  }
+  
+  function groupRollupDataMap(){    
+    return nest().rollup(rollup).map(data, d3.map);
+  }
+
+  function rollupData(){
+    return d3.nest().rollup(rollup).entries(data);
+  }
     
-    function groupData(){
-      return nest().entries(data);
-    }
-    
-    function groupRollupData(){    
-      return nest().rollup(rollup).entries(data);
-    }
-    
-    function groupRollupDataFor(key){    
-      var map = nest().rollup(rollup).map(data, d3.map);
-      return {key: key, values: map.get(key)};
-    }
-    
-    function rollupData(){
-      return d3.nest().rollup(rollup).entries(data);
-    }
-       
-    return render;
+  // set defaults
+
+  if (sorter) render.sorter(sorter);
+  render.group( {accessor: emptyfn} );
+
+  return render;
 }
 
-
+/*
+ * report.col
+ * column builder for report
+ *
+ */
 report.col = function(name){
     var instance = { render: defaultRender }
     
@@ -253,7 +282,60 @@ report.col = function(name){
     return builder;
 }
 
+/*
+ * report.group
+ * group builder for report
+ *
+ */
+report.group = function(name){
 
+  var instance = { header: defaultHeader }
+  
+  builder.label = function(_){
+    instance.label = _; return this;
+  }
+
+  builder.setName = function(_){
+    instance.name = _; return this;
+  }
+  
+  builder.accessor = function(_){
+    instance.accessor = ( typeof _ == "function" ? _ : fetchfn(_) );
+    return this;
+  }
+
+  builder.header = function(_){
+    instance.header = _; return this;
+  }
+
+  builder.footer = function(_){
+    instance.footer = _; return this;
+  }
+
+  function defaultHeader(th){
+    th.text(function(d){ return d.key; })
+  }
+
+  if (name){
+    builder.accessor(name);
+    builder.setName(name);
+    builder.label(name);
+  }
+
+  function builder(){
+    return instance;
+  }
+
+  return builder;
+}
+
+
+/*
+ * report.sorter
+ * single sorting behavior for columns
+ * cycles each column [asc, desc, off]
+ *
+ */
 report.sorter = function(){
 
   var LABEL = [ null, 'asc', 'desc' ]
@@ -306,6 +388,13 @@ report.sorter = function(){
 }
 
 
+/*
+ * report.multisorter
+ * multiple sorting behavior for columns
+ * sorts columns cumulatively
+ * cycles each column [asc, desc, off]
+ *
+ */
 report.multisorter = function(){
 
   var LABEL = [ null, 'asc', 'desc' ]

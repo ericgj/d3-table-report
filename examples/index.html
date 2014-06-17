@@ -3,11 +3,7 @@
     <title>Examples</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <link rel="stylesheet" href="../build/build.css" />
-    <style>
-      .d3-table-report {
-        width: 60%;
-      }
-    </style>
+    <link rel="stylesheet" href="examples.css" />
   </head>
   <body>
     <h1>d3 table report</h1>
@@ -44,11 +40,22 @@
       tabreport.groups =
         report().col('state')
                 .col( report.col('% in poverty').accessor(function(d){ return d['ALL FAMILIES']; }) )
-                .group( function(d){ return intervalOf(d['ALL FAMILIES'], [5,10,15,20]); } )
                 .rollup( function(recs){
-                  return { mean: d3.mean(recs, function(d){ return d['ALL FAMILIES']; }) }
+                  return { 
+                    mean: d3.mean(recs, function(d){ return d['ALL FAMILIES']; }),
+                    count: recs.length
+                  }
                 })
-                .grandRow( function(th){
+                .group( 
+                  report.group().accessor(povertyInterval('ALL FAMILIES'))
+                        .footer( function(th){
+                          th.text( function(d,i){
+                            if (i == 0) return "States with poverty rate " + d.key + "%";
+                            return d.values.count;
+                          })
+                        })
+                )
+                .footer( function(th){
                     th.text( function(d){
                         return "Mean poverty rate: " + d3.format('4.2f')(d.mean);
                     })
@@ -58,13 +65,25 @@
         report().sorter( report.sorter() )
                 .col('state')
                 .col( report.col('% in poverty').accessor(function(d){ return d['ALL FAMILIES']; }) )
-                .group( function(d){ return intervalOf(d['ALL FAMILIES'], [5,10,15,20]); } )
                 .rollup( function(recs){
-                  return { mean: d3.mean(recs, function(d){ return d['ALL FAMILIES']; }) }
+                  return { 
+                    mean: d3.mean(recs, function(d){ return d['ALL FAMILIES']; }),
+                    count: recs.length
+                  }
                 })
-                .grandRow( function(th){
-                    th.text( function(d){
-                        return "Mean poverty rate: " + d3.format('4.2f')(d.mean);
+                .group( 
+                  report.group().accessor(povertyInterval('ALL FAMILIES'))
+                        .footer( function(th){
+                          th.text( function(d,i){
+                            if (i == 0) return "States with poverty rate " + d.key + "%";
+                            return d.values.count;
+                          })
+                        })
+                )
+                .footer( function(th){
+                    th.text( function(d,i){
+                      if (i == 0) return "Mean poverty rate";
+                      return d3.format('4.2f')(d.mean);
                     })
                 })
 
@@ -76,6 +95,22 @@
                 .col( report.col('MARRIED COUPLES WITH CHILDREN').width('20%') )
                 .col( 'ALL SINGLE WOMEN' )
                 .col( report.col('SINGLE WOMEN WITH CHILDREN').width('20%') )
+                .rollup( function(recs){
+                  return [
+                    '',
+                    d3.mean(recs, function(d){ return d['ALL FAMILIES']; }),
+                    d3.mean(recs, function(d){ return d['ALL MARRIED COUPLES']; }),
+                    d3.mean(recs, function(d){ return d['MARRIED COUPLES WITH CHILDREN']; }),
+                    d3.mean(recs, function(d){ return d['ALL SINGLE WOMEN']; }),
+                    d3.mean(recs, function(d){ return d['SINGLE WOMEN WITH CHILDREN']; })
+                  ]
+                })
+                .footer( function(th){
+                  th.text( function(d,i){
+                    if (i == 0) return 'Mean';
+                    return d3.format('4.2f')(d[i]);
+                  })
+                })
 
       tabdata.forEach( function(d,i){
         page('/' + d[0], clearPage, selectTab(i), renderPage(d));
@@ -147,6 +182,11 @@
             });
 
             table.call( tabreport[tab[0]].data(data) );
+
+            var src = page.selectAll('.source').data([CENSUS_DATA_URL]);
+            src.enter().append('p').classed('source',true)
+            src.html(function(d){ return "Source: <a href='" + d + "'>" + d + "</a>"; });
+
             next();
           });
         }
@@ -157,6 +197,10 @@
         return el;
       };
       
+      function povertyInterval(name){
+        return function(d){ return intervalOf(d[name], [5,10,15,20]); }
+      }
+
       function intervalOf(val, intervals){
         var len = String(intervals[intervals.length-1]).length;
         for (var i=0;i<intervals.length;++i){
