@@ -1,0 +1,6 @@
+{
+  "name": "d3-table-report-example",
+  "dependencies": {
+    "ericgj/d3-table-report": "*"
+  }
+}

@@ -2,7 +2,7 @@
   <head>
     <title>Examples</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <link rel="stylesheet" href="../build/build.css" />
+    <link rel="stylesheet" href="build/build.css" />
     <link rel="stylesheet" href="examples.css" />
   </head>
   <body>
@@ -15,7 +15,7 @@
 
     <script src="page.js"></script>
     <script src="d3.v3.min.js"></script>
-    <script src="../build/build.js"></script>
+    <script src="build/build.js"></script>
     <script>
       var CENSUS_DATA_URL = 'http://api.census.gov/data/2012/acs5/profile?get=DP03_0119PE,DP03_0122PE,DP03_0123PE,DP03_0125PE,DP03_0126PE&for=state:*&key=64acfcf8995f5d31f51c47b27fd3129faa30db3f'
 
@@ -117,7 +117,7 @@
       });
  
       var fips = {};
-      d3.csv('/data/fips.csv').get( function(err,rows){
+      d3.csv('data/fips.csv').get( function(err,rows){
         if (err) throw err;
         rows.forEach(function(row){
           fips[row['fips']] = row['state']
@@ -125,7 +125,7 @@
       })
 
       var decode = {};
-      d3.csv('/data/decode.csv').get( function(err,rows){
+      d3.csv('data/decode.csv').get( function(err,rows){
         if (err) throw err;
         rows.forEach(function(row){
           decode[row['code']] = row['decode']
