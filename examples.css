@@ -1,0 +1,72 @@
+
+body {
+  font: 14px/1.5 Lato, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 500;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+
+#tabs > ul {
+  list-style-type: none;
+}
+
+#tabs > ul > li {
+  display: inline-block;
+  padding: 0 1em;
+  margin: 0 4px 0 0;
+  cursor: pointer;
+  border: 1px solid lightgrey;
+}
+
+#tabs > ul > li.selected {
+  background-color: darkgrey;
+  color: white;
+}
+
+#page {
+  height: 800px;
+  border: 1px solid lightgrey;
+  padding: 1em;
+  overflow-y: scroll;
+}
+
+.title {
+  background-color: darkgrey;
+  color: white;
+  padding: 4px;
+}
+
+.d3-table-report {
+  width: 60%;
+}
+
+.d3-table-report tr {
+  vertical-align: middle;
+  height: 2em;
+}
+
+.d3-table-report th {
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.d3-table-report tr.values:nth-child(2n){
+  background-color: #eeeeee;
+}
+
+.d3-table-report tr.group {
+  border-top: 1px solid black;
+}
+
+.d3-table-report tr.grand {
+  border-top: double black;
+}
+
+.source {
+  font-size: 10pt;
+  font-style: italic;
+}
+
