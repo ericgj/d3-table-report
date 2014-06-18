@@ -114,7 +114,7 @@ function report(sorter){
     // events
     
     // column sorting on click
-    colrows.on('click', function(col,i){
+    colcells.on('click', function(col,i){
       sorter.next(i);
       render(selection);
     });
